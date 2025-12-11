@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>North Star Compass</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.browser.min.js" defer></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0f1115; --card-bg:#1a1d24; --primary:#6366f1; --primary-hover:#4f46e5;
+      --text-main:#fff; --text-muted:#9ca3af; --border:#2d3748;
+      --accent-attention:#f59e0b; --accent-transaction:#10b981; --accent-productivity:#3b82f6;
+      --radius:24px; --gap:1rem;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',sans-serif}
+    body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--text-main);
+      background-image:radial-gradient(circle at 50% 0%, #1f2937 0%, transparent 70%);padding:1rem;}
+    .container{width:100%;max-width:640px;padding:2rem}
+    .card{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);padding:2.5rem;position:relative;
+      box-shadow:0 25px 50px -12px rgba(0,0,0,.5);overflow:hidden}
+    h1{font-weight:800;font-size:2.1rem;margin-bottom:.5rem}
+    p.lead{color:var(--text-muted);margin-bottom:1.25rem}
+    .btn{display:block;width:100%;padding:1rem;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.03);
+      text-align:left;color:var(--text-main);font-weight:500;cursor:pointer;margin-bottom:.75rem}
+    .btn:focus{outline:3px solid rgba(99,102,241,.18);outline-offset:2px}
+    .btn[type="button"]{appearance:none}
+    .btn:hover{transform:translateY(-2px);background:var(--primary);border-color:var(--primary)}
+    .btn-start{background:var(--primary);border:none;text-align:center;font-weight:700}
+    .btn-start:hover{background:var(--primary-hover);transform:scale(1.02)}
+    .btn-reset{background:transparent;border:1px solid var(--border);color:var(--text-muted);margin-top:1rem}
+    .progress-container{position:absolute;top:0;left:0;width:100%;height:6px;background:#2d3748}
+    .progress-bar{height:100%;background:var(--primary);width:0;transition:width .4s ease}
+    .hidden{display:none}
+    .tag{display:inline-block;padding:.4rem .9rem;border-radius:999px;font-weight:700;font-size:.85rem;letter-spacing:.05em}
+    .tag-attention{background:rgba(245,158,11,.12);color:var(--accent-attention);border:1px solid rgba(245,158,11,.18)}
+    .tag-transaction{background:rgba(16,185,129,.08);color:var(--accent-transaction);border:1px solid rgba(16,185,129,.14)}
+    .tag-productivity{background:rgba(59,130,246,.08);color:var(--accent-productivity);border:1px solid rgba(59,130,246,.14)}
+    .recommendation-box{background:rgba(255,255,255,.03);padding:1rem;border-radius:12px;text-align:left;margin-top:1rem}
+    .recommendation-box h3{font-size:.85rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:.5rem}
+    .recommendation-box ul{list-style:none;padding-left:0}
+    .recommendation-box li{margin-bottom:.5rem}
+    @media (max-width:600px){.card{padding:1.5rem}h1{font-size:1.6rem}}
+    /* reduced motion */
+    @media (prefers-reduced-motion: reduce){
+      .progress-bar{transition:none}
+      .btn:hover{transform:none}
+    }
+  </style>
+</head>
+<body>
+  <noscript>
+    <div style="max-width:640px;margin:2rem auto;background:#1a1d24;padding:1rem;border-radius:12px;color:#fff;">
+      This app requires JavaScript. Please enable JavaScript to use the North Star Compass.
+    </div>
+  </noscript>
+
+  <div class="container" id="app">
+    <div class="card" id="appCard" aria-live="polite">
+      <div class="progress-container" aria-hidden="false">
+        <div id="progressBar" class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+      </div>
+
+      <!-- Intro -->
+      <section id="screen-intro" >
+        <h1>Find Your <span style="color:var(--primary)">North Star</span></h1>
+        <p class="lead">Don't pick a vanity metric. Discover the one metric that aligns your team, product, and strategy.</p>
+        <button type="button" class="btn btn-start" id="startBtn">Find My Metric</button>
+      </section>
+
+      <!-- Quiz -->
+      <section id="screen-quiz" class="hidden" aria-hidden="true">
+        <h2 id="questionText">Question goes here</h2>
+        <div id="optionsContainer" role="list" aria-label="Answer choices"></div>
+      </section>
+
+      <!-- Result -->
+      <section id="screen-result" class="hidden" aria-hidden="true">
+        <span id="resultIcon" style="font-size:3.2rem;display:block;margin-bottom:.5rem">✨</span>
+        <div id="resultTag" class="tag">Result</div>
+        <h2 id="resultTitle" style="margin-top:.75rem">Your North Star Strategy</h2>
+        <p id="resultDesc" class="lead">Description of the strategy.</p>
+
+        <div class="recommendation-box" aria-labelledby="recTitle">
+          <h3 id="recTitle">Recommended North Star Metrics</h3>
+          <ul id="resultMetrics"></ul>
+        </div>
+
+        <button type="button" class="btn btn-reset" id="resetBtn">Start Over</button>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    /* --- Data --- */
+    const questions = [
+      { id:1, text:"How does your product primarily deliver value?", options:[
+        { text:"Users spend time consuming content or media", value:"attention" },
+        { text:"Users complete a purchase or specific transaction", value:"transaction" },
+        { text:"Users perform a task or create something efficiently", value:"productivity" }
+      ]},
+      { id:2, text:"How do you make money?", options:[
+        { text:"Ads, subscriptions based on consumption (Netflix/Spotify)", value:"attention" },
+        { text:"Fee per transaction or unit sold (Amazon, Uber)", value:"transaction" },
+        { text:"SaaS subscription or seat-based (Slack, Adobe)", value:"productivity" }
+      ]},
+      { id:3, text:"If your users are successful, they will...", options:[
+        { text:"Come back frequently to see what's new", value:"attention" },
+        { text:"Buy effortlessly without friction", value:"transaction" },
+        { text:"Finish their work faster and leave the app", value:"productivity" }
+      ]}
+    ];
+
+    const results = {
+      attention:{
+        title:"The Attention Game",
+        tagClass:"tag-attention",
+        icon:"👁️",
+        desc:"Your goal is to maximize the time users spend engaging with your content. You are competing for mindshare.",
+        metrics:[
+          "Time Spent Listening / Watching",
+          "Daily Active Users (DAU) consuming content",
+          "Content Consumption per Session"
+        ]
+      },
+      transaction:{
+        title:"The Transaction Game",
+        tagClass:"tag-transaction",
+        icon:"🛒",
+        desc:"Your goal is to help customers find what they need and purchase it with zero friction.",
+        metrics:[
+          "Number of Completed Orders",
+          "Nights Booked",
+          "Rides Completed per Week"
+        ]
+      },
+      productivity:{
+        title:"The Productivity Game",
+        tagClass:"tag-productivity",
+        icon:"⚡",
+        desc:"Your goal is efficiency. If users spend too much time, your UX might be bad. You want them to succeed and finish.",
+        metrics:[
+          "Records/Files Created or Saved",
+          "Successful Queries/Tasks Completed",
+          "Weekly Active Users performing 'Deep Work'"
+        ]
+      }
+    };
+
+    /* --- State --- */
+    const TOTAL = questions.length;
+    let currentStep = 0;
+    let scores = { attention:0, transaction:0, productivity:0 };
+    const app = document.getElementById('app');
+
+    /* --- Elements --- */
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const screenIntro = document.getElementById('screen-intro');
+    const screenQuiz = document.getElementById('screen-quiz');
+    const screenResult = document.getElementById('screen-result');
+    const qText = document.getElementById('questionText');
+    const optsContainer = document.getElementById('optionsContainer');
+    const progressBar = document.getElementById('progressBar');
+    const resultIcon = document.getElementById('resultIcon');
+    const resultTag = document.getElementById('resultTag');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultDesc = document.getElementById('resultDesc');
+    const resultMetrics = document.getElementById('resultMetrics');
+
+    /* --- Utilities --- */
+    function setProgress(percent){
+      const p = Math.max(0, Math.min(100, Math.round(percent)));
+      progressBar.style.width = p + '%';
+      progressBar.setAttribute('aria-valuenow', p);
+    }
+
+    function show(element){
+      element.classList.remove('hidden');
+      element.setAttribute('aria-hidden','false');
+    }
+    function hide(element){
+      element.classList.add('hidden');
+      element.setAttribute('aria-hidden','true');
+    }
+
+    function disableOptions(){
+      Array.from(optsContainer.querySelectorAll('button')).forEach(b => b.disabled = true);
+    }
+
+    function enableOptions(){
+      Array.from(optsContainer.querySelectorAll('button')).forEach(b => b.disabled = false);
+    }
+
+    /* Deterministic tie-breaker: prefer the earliest key order (attention->transaction->productivity) */
+    function determineWinner(scoresObj){
+      const order = ['attention','transaction','productivity'];
+      let max = -Infinity;
+      let winner = order[0];
+      order.forEach(key => {
+        if(scoresObj[key] > max){
+          max = scoresObj[key];
+          winner = key;
+        }
+      });
+      return winner;
+    }
+
+    /* --- Rendering --- */
+    function renderQuestion(){
+      const q = questions[currentStep];
+      const percent = (currentStep / TOTAL) * 100;
+      setProgress(percent);
+
+      qText.textContent = q.text;
+      optsContainer.innerHTML = '';
+      optsContainer.setAttribute('role','list');
+      q.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn';
+        btn.textContent = opt.text;
+        btn.setAttribute('data-value', opt.value);
+        btn.setAttribute('role','listitem');
+        btn.addEventListener('click', () => handleAnswer(opt.value, btn));
+        optsContainer.appendChild(btn);
+      });
+      enableOptions();
+      const first = optsContainer.querySelector('button');
+      if(first) first.focus();
+    }
+
+    function handleAnswer(value, btnEl){
+      disableOptions();
+      if(btnEl) btnEl.classList.add('selected');
+      if(typeof value === 'string' && scores.hasOwnProperty(value)) scores[value]++;
+      currentStep++;
+      if(currentStep < TOTAL){
+        setTimeout(() => renderQuestion(), 220);
+      } else {
+        setTimeout(showResult, 220);
+      }
+    }
+
+    function showResult(){
+      setProgress(100);
+      const winner = determineWinner(scores);
+      const data = results[winner] || results.attention;
+
+      resultIcon.textContent = data.icon;
+      resultTag.textContent = data.title.toUpperCase();
+      resultTag.className = `tag ${data.tagClass}`;
+      resultTitle.textContent = data.title;
+      resultDesc.textContent = data.desc;
+
+      resultMetrics.innerHTML = '';
+      data.metrics.forEach(m => {
+        const li = document.createElement('li');
+        li.textContent = m;
+        resultMetrics.appendChild(li);
+      });
+
+      transition(screenQuiz, screenResult);
+      if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches && typeof confetti === 'function'){
+        setTimeout(() => {
+          try{
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#6366f1','#10b981','#f59e0b'] });
+          }catch(e){/* ignore confetti errors */ }
+        }, 450);
+      }
+    }
+
+    function reset(){
+      currentStep = 0;
+      scores = { attention:0, transaction:0, productivity:0 };
+      setProgress(0);
+      transition(screenResult, screenIntro);
+    }
+
+    function transition(hideEl, showEl){
+      if(!hideEl || !showEl) return;
+      hide(hideEl);
+      show(showEl);
+      if(showEl === screenQuiz) renderQuestion();
+      if(showEl === screenQuiz){
+        const first = optsContainer.querySelector('button');
+        if(first) first.focus();
+      } else if(showEl === screenIntro){
+        startBtn.focus();
+      } else if(showEl === screenResult){
+        document.getElementById('resetBtn').focus();
+      }
+    }
+
+    /* --- Event wiring --- */
+    startBtn.addEventListener('click', () => {
+      transition(screenIntro, screenQuiz);
+    });
+
+    resetBtn.addEventListener('click', reset);
+
+    /* initialize */
+    setProgress(0);
+    window.__NSCompass = { questions, results, getState:()=>({currentStep,scores}) };
+  </script>
+</body>
+</html>
